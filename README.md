@@ -1,7 +1,7 @@
 nailgun
 =======
 
-[![Build status](https://circleci.com/gh/facebook/nailgun.svg?style=svg)](https://circleci.com/gh/facebook/nailgun)
+This repository is an independent fork of the original Nailgun project. It includes code changes necessary to run on Java versions that do not support the SecurityManager API.
 
 ---
 
@@ -43,8 +43,3 @@ For more information, see [the nailgun website](https://github.com/facebook/nail
 License
 -------
 Apache License 2.0
-
-Legal
------
-- [Privacy](https://opensource.facebook.com/legal/privacy)
-- [Terms](https://opensource.facebook.com/legal/terms)
