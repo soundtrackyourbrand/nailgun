@@ -3,13 +3,7 @@
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <parent>
-    <groupId>org.sonatype.oss</groupId>
-    <artifactId>oss-parent</artifactId>
-    <version>7</version>
-  </parent>
-
-  <groupId>com.facebook</groupId>
+  <groupId>com.soundtrackyourbrand</groupId>
   <artifactId>nailgun-all</artifactId>
   <version>1.0.1</version>
   <packaging>pom</packaging>
@@ -29,7 +23,7 @@
 
     This project contains the server and examples.
   </description>
-  <url>http://github.com/facebook/nailgun</url>
+  <url>http://github.com/soundtrackyourbrand/nailgun</url>
 
   <licenses>
     <license>
@@ -40,9 +34,9 @@
   </licenses>
 
   <scm>
-    <url>scm:git:git@github.com:facebook/nailgun.git</url>
-    <connection>scm:git:git@github.com:facebook/nailgun.git</connection>
-    <developerConnection>scm:git:git@github.com:facebook/nailgun.git</developerConnection>
+    <url>scm:git:git@github.com:soundtrackyourbrand/nailgun.git</url>
+    <connection>scm:git:git@github.com:soundtrackyourbrand/nailgun.git</connection>
+    <developerConnection>scm:git:git@github.com:soundtrackyourbrand/nailgun.git</developerConnection>
     <tag>nailgun-all-1.0.1</tag>
   </scm>
 
@@ -50,6 +44,10 @@
     <developer>
       <name>Facebook</name>
       <url>http://github.com/facebook/nailgun</url>
+    </developer>
+    <developer>
+      <name>Soundtrack</name>
+      <url>http://github.com/soundtrackyourbrand/nailgun</url>
     </developer>
   </developers>
 
@@ -98,61 +96,15 @@
           </execution>
         </executions>
       </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-release-plugin</artifactId>
-        <version>2.5.3</version>
-        <configuration>
-          <arguments>-Dgpg.passphrase=${gpg.passphrase}</arguments>
-        </configuration>
-      </plugin>
     </plugins>
   </build>
 
   <distributionManagement>
-    <snapshotRepository>
-      <id>sonatype-nexus-snapshots</id>
-      <name>Sonatype Nexus snapshot repository</name>
-      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-    </snapshotRepository>
     <repository>
-      <id>sonatype-nexus-staging</id>
-      <name>Sonatype Nexus release repository</name>
-      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+      <id>github</id>
+      <name>GitHub Packages</name>
+      <url>https://maven.pkg.github.com/soundtrackyourbrand/nailgun</url>
     </repository>
   </distributionManagement>
-
-  <profiles>
-    <profile>
-      <id>release-sign-artifacts</id>
-      <activation>
-        <property>
-          <name>performRelease</name>
-          <value>true</value>
-        </property>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-gpg-plugin</artifactId>
-            <version>1.4</version>
-            <configuration>
-              <passphrase>${gpg.passphrase}</passphrase>
-            </configuration>
-            <executions>
-              <execution>
-                <id>sign-artifacts</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>sign</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
 
 </project>
