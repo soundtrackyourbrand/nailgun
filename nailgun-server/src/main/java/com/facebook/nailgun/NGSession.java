@@ -321,10 +321,22 @@ public class NGSession extends Thread {
       // System.exit() explicitly then this will do nothing
       comm.exit(NGConstants.EXIT_SUCCESS);
 
-    } catch (NGExitException exitEx) {
-      // We got here if nail called System.exit(). Just quit with provided exit code.
-      LOG.log(Level.INFO, "Nail cleanly exited with status {0}", exitEx.getStatus());
-      comm.exit(exitEx.getStatus());
+    } catch (InternalError e) {
+      String msg = e.getMessage();
+      if (msg != null && msg.startsWith("NG_EXIT_TRAP:")) {
+        // We got here if nail called System.exit(). Just quit with provided exit code.
+        try {
+          int status = Integer.parseInt(msg.substring(13));
+          LOG.log(Level.INFO, "Nail cleanly exited with status {0}", status);
+          comm.exit(status);
+        } catch (NumberFormatException nfe) {
+          LOG.log(Level.WARNING, "Nail threw invalid NG_EXIT_TRAP: {0}", msg);
+          comm.exit(NGConstants.EXIT_EXCEPTION);
+        }
+      } else {
+        LOG.log(Level.WARNING, "Nail raised unhandled exception", e);
+        comm.exit(NGConstants.EXIT_EXCEPTION); // remote exception constant
+      }
     } catch (NGNailNotFoundException notFoundEx) {
       LOG.log(Level.WARNING, "Nail not found", notFoundEx);
       comm.exit(NGConstants.EXIT_NOSUCHCOMMAND);

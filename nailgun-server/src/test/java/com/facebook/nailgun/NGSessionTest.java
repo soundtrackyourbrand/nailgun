@@ -109,7 +109,7 @@ class NGSessionTest {
   static class NGSessionTestExitException {
     public static void nailMain(NGContext context) {
       NGSessionTestCompletionSignal.nailMain(context);
-      throw new NGExitException(123);
+      throw new InternalError("NG_EXIT_TRAP:123");
     }
   }
 
