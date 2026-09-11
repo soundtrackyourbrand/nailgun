@@ -68,6 +68,7 @@ public class NGCommunicator implements Closeable {
   private boolean isExited = false;
   private int remaining = 0;
   private AtomicBoolean clientConnected = new AtomicBoolean(true);
+  private final AtomicBoolean heartbeatReceived = new AtomicBoolean(false);
   private final Set<NGClientListener> clientListeners = new HashSet<>();
   private final Set<NGHeartbeatListener> heartbeatListeners = new HashSet<>();
   private static final long TERMINATION_TIMEOUT_MS = 1000;
@@ -230,7 +231,7 @@ public class NGCommunicator implements Closeable {
             } else if (cause instanceof SocketTimeoutException) {
               reason = NGClientDisconnectReason.SOCKET_TIMEOUT;
               LOG.log(
-                  Level.WARNING,
+                  missedHeartbeatLevel(),
                   "Nailgun client socket timed out after " + heartbeatTimeoutMillis + " ms",
                   cause);
             } else {
@@ -239,7 +240,7 @@ public class NGCommunicator implements Closeable {
           } catch (TimeoutException e) {
             reason = NGClientDisconnectReason.HEARTBEAT;
             LOG.log(
-                Level.WARNING,
+                missedHeartbeatLevel(),
                 "Nailgun client read future timed out after " + futureTimeout + " ms",
                 e);
           } catch (Throwable e) {
@@ -261,6 +262,10 @@ public class NGCommunicator implements Closeable {
 
           LOG.log(Level.FINE, "Orchestrator thread finished");
         });
+  }
+
+  private Level missedHeartbeatLevel() {
+    return heartbeatReceived.get() ? Level.WARNING : Level.FINE;
   }
 
   private void waitTerminationAndNotifyClients(NGClientDisconnectReason reason) {
@@ -514,6 +519,7 @@ public class NGCommunicator implements Closeable {
 
       case NGConstants.CHUNKTYPE_HEARTBEAT:
         LOG.log(Level.FINEST, "Got client heartbeat");
+        heartbeatReceived.set(true);
         break;
 
       default:

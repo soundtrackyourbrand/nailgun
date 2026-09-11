@@ -20,6 +20,7 @@ package com.facebook.nailgun;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,7 +32,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -78,6 +88,99 @@ class NGCommunicatorTest {
     NGCommunicator comm = new NGCommunicator(socket, 0);
     CommandContext context = comm.readCommandContext();
     assertEquals(command, context.getCommand());
+  }
+
+  private static byte[] chunk(byte chunkType, String payload) throws IOException {
+    byte[] payloadBin = payload.getBytes(StandardCharsets.UTF_8);
+    try (ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+        DataOutputStream stream = new DataOutputStream(byteStream)) {
+      stream.writeInt(payloadBin.length);
+      stream.writeByte(chunkType);
+      stream.write(payloadBin);
+      stream.flush();
+      return byteStream.toByteArray();
+    }
+  }
+
+  private static class TimesOutAfterStream extends InputStream {
+    final CountDownLatch timedOutLatch = new CountDownLatch(1);
+
+    private final byte[] prefix;
+    private int pos = 0;
+
+    TimesOutAfterStream(byte[] prefix) {
+      this.prefix = prefix;
+    }
+
+    @Override
+    public int read() throws IOException {
+      if (pos < prefix.length) {
+        return prefix[pos++] & 0xff;
+      }
+      timedOutLatch.countDown();
+      throw new SocketTimeoutException("Read timed out");
+    }
+  }
+
+  private static class CapturingHandler extends Handler {
+    final List<LogRecord> records = new CopyOnWriteArrayList<>();
+
+    @Override
+    public void publish(LogRecord record) {
+      records.add(record);
+    }
+
+    @Override
+    public void flush() {}
+
+    @Override
+    public void close() {}
+  }
+
+  private Level levelOfTimeoutRecord(byte[] beforeTimeout) throws Exception {
+    Logger logger = Logger.getLogger(NGCommunicator.class.getName());
+    CapturingHandler handler = new CapturingHandler();
+    handler.setLevel(Level.ALL);
+    Level previousLevel = logger.getLevel();
+    logger.setLevel(Level.ALL);
+    logger.addHandler(handler);
+
+    TimesOutAfterStream stream = new TimesOutAfterStream(beforeTimeout);
+    when(socket.getInputStream()).thenReturn(stream);
+
+    NGCommunicator comm = new NGCommunicator(socket, 100);
+    try {
+      comm.readCommandContext();
+      assertTrue(stream.timedOutLatch.await(5, TimeUnit.SECONDS), "the read should have timed out");
+      for (int i = 0; i < 100; i++) {
+        for (LogRecord record : handler.records) {
+          if (record.getMessage().startsWith("Nailgun client socket timed out")) {
+            return record.getLevel();
+          }
+        }
+        Thread.sleep(20);
+      }
+      return null;
+    } finally {
+      logger.removeHandler(handler);
+      logger.setLevel(previousLevel);
+      comm.close();
+    }
+  }
+
+  @Test
+  void socketTimeoutIsNotWarnedAboutWhenClientNeverHeartbeated() throws Exception {
+    assertEquals(
+        Level.FINE, levelOfTimeoutRecord(chunk(NGConstants.CHUNKTYPE_COMMAND, "some_command")));
+  }
+
+  @Test
+  void socketTimeoutIsWarnedAboutWhenClientHadHeartbeated() throws Exception {
+    ByteArrayOutputStream prefix = new ByteArrayOutputStream();
+    prefix.write(chunk(NGConstants.CHUNKTYPE_COMMAND, "some_command"));
+    prefix.write(chunk(NGConstants.CHUNKTYPE_HEARTBEAT, ""));
+
+    assertEquals(Level.WARNING, levelOfTimeoutRecord(prefix.toByteArray()));
   }
 
   @Test
