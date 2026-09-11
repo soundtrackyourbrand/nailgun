@@ -17,6 +17,7 @@
 
 package com.facebook.nailgun;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -24,6 +25,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -335,6 +337,7 @@ public class NGSession extends Thread {
         }
       } else {
         LOG.log(Level.WARNING, "Nail raised unhandled exception", e);
+        sendStackTrace(comm, e);
         comm.exit(NGConstants.EXIT_EXCEPTION); // remote exception constant
       }
     } catch (NGNailNotFoundException notFoundEx) {
@@ -342,7 +345,22 @@ public class NGSession extends Thread {
       comm.exit(NGConstants.EXIT_NOSUCHCOMMAND);
     } catch (Throwable t) {
       LOG.log(Level.WARNING, "Nail raised unhandled exception", t);
+      sendStackTrace(comm, t);
       comm.exit(NGConstants.EXIT_EXCEPTION); // remote exception constant
+    }
+  }
+
+  private static void sendStackTrace(NGCommunicator comm, Throwable t) {
+    try {
+      PrintStream trace =
+          new PrintStream(
+              new BufferedOutputStream(new NGOutputStream(comm, NGConstants.CHUNKTYPE_STDERR)),
+              false,
+              StandardCharsets.UTF_8);
+      t.printStackTrace(trace);
+      trace.flush();
+    } catch (Throwable ignored) {
+      LOG.log(Level.WARNING, "Unable to send nail stack trace to client");
     }
   }
 

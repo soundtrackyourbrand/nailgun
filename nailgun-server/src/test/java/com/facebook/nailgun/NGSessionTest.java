@@ -17,13 +17,23 @@ limitations under the License.
 */
 package com.facebook.nailgun;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -31,6 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 class NGSessionTest {
 
@@ -144,5 +155,65 @@ class NGSessionTest {
     when(commandContext.getCommand()).thenReturn("some_nail_that_does_not_exist");
     runNail();
     verify(socket, timeout(10000)).close();
+  }
+
+  static class NGSessionTestThrowingNail {
+    public static void nailMain(NGContext context) {
+      NGSessionTestCompletionSignal.nailMain(context);
+      throw new IllegalStateException("nail exploded");
+    }
+  }
+
+  private ByteArrayOutputStream captureStderr() throws IOException {
+    ByteArrayOutputStream received = new ByteArrayOutputStream();
+    doAnswer(
+            invocation -> {
+              byte[] bytes = invocation.getArgument(1);
+              int offset = invocation.getArgument(2);
+              int length = invocation.getArgument(3);
+              synchronized (received) {
+                received.write(bytes, offset, length);
+              }
+              return null;
+            })
+        .when(communicator)
+        .send(eq(NGConstants.CHUNKTYPE_STDERR), any(byte[].class), anyInt(), anyInt());
+    return received;
+  }
+
+  @Test
+  void sendsStackTraceToClientOnUnhandledException() throws IOException {
+    ByteArrayOutputStream received = captureStderr();
+    when(commandContext.getCommand()).thenReturn(NGSessionTestThrowingNail.class.getName());
+    runNail();
+    verify(communicator, timeout(10000)).exit(NGConstants.EXIT_EXCEPTION);
+
+    String trace;
+    synchronized (received) {
+      trace = received.toString(StandardCharsets.UTF_8);
+    }
+    assertTrue(trace.contains("java.lang.IllegalStateException: nail exploded"), trace);
+    assertTrue(trace.contains(NGSessionTestThrowingNail.class.getName()), trace);
+  }
+
+  @Test
+  void sendsStackTraceBeforeExitCode() throws IOException {
+    when(commandContext.getCommand()).thenReturn(NGSessionTestThrowingNail.class.getName());
+    runNail();
+    verify(communicator, timeout(10000)).exit(NGConstants.EXIT_EXCEPTION);
+
+    InOrder order = inOrder(communicator);
+    order
+        .verify(communicator, atLeastOnce())
+        .send(eq(NGConstants.CHUNKTYPE_STDERR), any(byte[].class), anyInt(), anyInt());
+    order.verify(communicator).exit(NGConstants.EXIT_EXCEPTION);
+  }
+
+  @Test
+  void sendsNothingToStderrOnSuccess() throws IOException {
+    runNail();
+    verify(communicator, timeout(10000)).exit(0);
+    verify(communicator, never())
+        .send(eq(NGConstants.CHUNKTYPE_STDERR), any(byte[].class), anyInt(), anyInt());
   }
 }
