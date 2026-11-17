@@ -9,5 +9,10 @@ credentials.
    and commit.
 2. Tag the commit `v<version>` and push the tag.
 
-The `Release` workflow then publishes `nailgun-server` and its parent POM, `nailgun-all`. It
-fails if the tag does not match the version in `pom.xml`. A version can be published once.
+Only repository admins can push a `v*` tag. The `Release` workflow then tests the tag and
+publishes `nailgun-server` and its parent POM, `nailgun-all`. It fails if the tag does not
+match the version in `pom.xml`. A version can be published once.
+
+Publishing authenticates to Google Cloud through workload identity federation, which trusts
+one thing: a job in this repository's `release` environment, on a tag. The environment
+admits `v*` tags only. Keep both settings, or any workflow anyone pushes could publish.
