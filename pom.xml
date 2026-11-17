@@ -101,10 +101,15 @@
 
   <distributionManagement>
     <repository>
-      <id>github</id>
-      <name>GitHub Packages</name>
-      <url>https://maven.pkg.github.com/soundtrackyourbrand/nailgun</url>
+      <id>artifact-registry</id>
+      <name>Soundtrack public Maven repository</name>
+      <url>https://us-maven.pkg.dev/syb-common-images/maven-public</url>
     </repository>
+    <snapshotRepository>
+      <id>artifact-registry</id>
+      <name>Soundtrack public Maven repository</name>
+      <url>https://us-maven.pkg.dev/syb-common-images/maven-public</url>
+    </snapshotRepository>
   </distributionManagement>
 
 </project>
